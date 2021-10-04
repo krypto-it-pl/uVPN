@@ -41,6 +41,14 @@ struct config_t
   unsigned short log_level;
   unsigned char forground;
 
+  char * onTapCreate;
+  char * onTcpListen;
+  char * onClientConnect;
+  char * onConnect;
+  char * onClientConnectFail;
+  char * onConnectFail;
+  char * onConnectionEnd;
+
   // non configurable part
   size_t static_servers_count;
   struct static_servers_config_t * static_servers;

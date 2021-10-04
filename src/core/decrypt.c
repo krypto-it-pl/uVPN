@@ -7,6 +7,13 @@
 #include "global.h"
 #include <twofish.h>
 
+#define _BSD_SOURCE
+#ifndef SYS_ENDIAN
+#include <endian.h>
+#else
+#include <sys/endian.h>
+#endif
+
 void decrypt_worker(void * void_data, size_t data_size)
 {
   struct packet_record * data = (struct packet_record *)void_data;

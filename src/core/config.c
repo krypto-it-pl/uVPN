@@ -58,6 +58,17 @@ struct config_args config_const[] =
   { "pid_file", 1, parser_string, offsetof(struct config_t, pid_file) },
   { "log_level", 1, parser_ushort, offsetof(struct config_t, log_level) },
   { "forground", 1, parser_uchar_bool, offsetof(struct config_t, forground) },
+  { "onTapCreate", 1, parser_string, offsetof(struct config_t, onTapCreate) },
+  { "onTcpListen", 1, parser_string, offsetof(struct config_t, onTcpListen) },
+  { "onClientConnect", 1, parser_string, offsetof(struct config_t,
+      onClientConnect) },
+  { "onConnect", 1, parser_string, offsetof(struct config_t, onConnect) },
+  { "onClientConnectFail", 1, parser_string, offsetof(struct config_t,
+      onClientConnectFail) },
+  { "onConnectFail", 1, parser_string, offsetof(struct config_t,
+      onConnectFail) },
+  { "onConnectionEnd", 1, parser_string, offsetof(struct config_t,
+      onConnectionEnd) },
 };
 
 struct config_args servers_ini[] = {

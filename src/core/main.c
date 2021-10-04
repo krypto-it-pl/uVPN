@@ -31,6 +31,7 @@
 #include <logger.h>
 #include <random.h>
 #include <dns.h>
+#include <exec.h>
 
 #define MAX_CRYPTO_WORKERS 32
 #define MAX_CHECKSUM_WORKERS 16
@@ -405,6 +406,15 @@ static int iterate_over_dns(const char * address, unsigned short port, \
         cipher_mode_str_to_int(data->cipher));
 
     data->last_reconnect_try = time(NULL);
+
+    char buffer[128], buffer2[64], buffer3[64];;
+    snprintf(buffer, sizeof(buffer) - 1, "SERVER_ADDR=%s:%hu", \
+        data->connect_addr, data->connect_port);
+    snprintf(buffer2, sizeof(buffer2) - 1, "NAME=%s", config->name);
+    snprintf(buffer3, sizeof(buffer3) - 1, "SERVER_NAME=%s", data->name);
+
+    exec_with_env(config->onConnect, buffer, buffer2, buffer3, NULL);
+
     return 1;
   }
 
@@ -450,10 +460,6 @@ int main(int argc, char * argv[])
     config->crypto_workers = MAX_CRYPTO_WORKERS;
   if (config->checksum_workers > MAX_CHECKSUM_WORKERS)
     config->checksum_workers = MAX_CHECKSUM_WORKERS;
-  if (!config->listen_port)
-    config->listen_port = DEFAULT_PORT;
-  if (!config->listen_addr)
-    config->listen_addr = strdup("0.0.0.0");
 
   if (!config->private_key) {
     fprintf(stderr, "Private key path not found!");
@@ -521,6 +527,12 @@ int main(int argc, char * argv[])
     goto end;
   }
 
+  char buffer[32], buffer2[64];
+  snprintf(buffer, sizeof(buffer) - 1, "TAP=%s", config->tap_name);
+  snprintf(buffer2, sizeof(buffer2) - 1, "NAME=%s", config->name);
+
+  exec_with_env(config->onTapCreate, buffer, buffer2, NULL);
+
   on_signal_config_reload(0);
 
   sem_wait(&config_sem);
@@ -532,16 +544,29 @@ int main(int argc, char * argv[])
 
   tap_init(&tap_conn, tapint, 0);
 
-  logger_printf(LOGGER_INFO, "Open TCP socket for listen at [%s]:%hu", \
-      config->listen_addr, config->listen_port);
-
   struct tcp_conn_desc_t conn;
-  if (tcp_conn_listen(&conn, config->listen_addr, config->listen_port) \
-      != TCP_CONN_STAT_OK) {
-    logger_printf(LOGGER_ERROR, "Unable to open TCP socket" \
-        " for listen at [%s]:%hu", config->listen_addr, config->listen_port);
-    goto end;
-  }
+
+  if (config->listen_addr && config->listen_port) {
+    logger_printf(LOGGER_INFO, "Open TCP socket for listen at [%s]:%hu", \
+        config->listen_addr, config->listen_port);
+
+    if (tcp_conn_listen(&conn, config->listen_addr, config->listen_port) \
+        != TCP_CONN_STAT_OK) {
+      logger_printf(LOGGER_ERROR, "Unable to open TCP socket" \
+          " for listen at [%s]:%hu", config->listen_addr, config->listen_port);
+      goto end;
+    }
+
+    if (config->onTcpListen) {
+      char buffer[128], buffer2[64];
+      snprintf(buffer, sizeof(buffer) - 1, "LISTEN=%s:%hu", \
+          config->listen_addr, config->listen_port);
+      snprintf(buffer2, sizeof(buffer2) - 1, "NAME=%s", config->name);
+
+      exec_with_env(config->onTcpListen, buffer, buffer2, NULL);
+    }
+  } else
+    conn.sock = 0;
 
   while (!end_now) {
     int r = 0;
@@ -558,6 +583,11 @@ int main(int argc, char * argv[])
         }
       }
       sem_post(&conns_sem);
+
+      if (!conn.sock) {
+        sleep(1);
+        continue;
+      }
 
       fd_set set;
       FD_ZERO(&set);

@@ -14,6 +14,7 @@ set(SOURCE_FILES
   src/lib/allocator.c
   src/lib/avl.c
   src/lib/queue.c
+  src/lib/exec.c
   src/core/main.c
   src/core/decrypt.c
   src/core/counter.c

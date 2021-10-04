@@ -14,6 +14,14 @@
 #include <random.h>
 #include <sys/select.h>
 #include "config.h"
+#include <exec.h>
+
+#define _BSD_SOURCE
+#ifndef SYS_ENDIAN
+#include <endian.h>
+#else
+#include <sys/endian.h>
+#endif
 
 #define DEFAULT_MSS 1460
 #define WRITE_PART_MULT (16)
@@ -380,23 +388,92 @@ static void tcp_io_read_thread(void * data_void)
   size_t local_buffer_fill = 0;
 
   if (data->auth) {
-    if (tcp_io_read_auth_send(data))
+    if (tcp_io_read_auth_send(data)) {
+      char buffer[128], buffer2[64], buffer3[64];
+      snprintf(buffer, sizeof(buffer) - 1, "CLIENT_ADDR=%s:%hU", data->ipstr, \
+          data->port);
+      snprintf(buffer2, sizeof(buffer2) - 1, "NAME=%s", config->name);
+      snprintf(buffer3, sizeof(buffer3) - 1, "CLIENT_NAME=%s", data->name);
+
+      exec_with_env(config->onClientConnect, buffer, buffer2, buffer3, NULL);
       goto tcp_read_end;
-    if (tcp_io_read_auth_recv(data))
+    }
+    if (tcp_io_read_auth_recv(data)) {
+      char buffer[128], buffer2[64], buffer3[64];
+      snprintf(buffer, sizeof(buffer) - 1, "CLIENT_ADDR=%s:%hu", data->ipstr, \
+          data->port);
+      snprintf(buffer2, sizeof(buffer2) - 1, "NAME=%s", config->name);
+      snprintf(buffer3, sizeof(buffer3) - 1, "CLIENT_NAME=%s", data->name);
+
+      exec_with_env(config->onClientConnectFail, buffer, buffer2, buffer3, \
+          NULL);
       goto tcp_read_end;
+    }
   } else {
-    if (tcp_io_read_auth_recv(data))
+    if (tcp_io_read_auth_recv(data)) {
+      char buffer[128], buffer2[64], buffer3[64];
+      snprintf(buffer, sizeof(buffer) - 1, "CLIENT_ADDR=%s:%hu", data->ipstr, \
+          data->port);
+      snprintf(buffer2, sizeof(buffer2) - 1, "NAME=%s", config->name);
+      snprintf(buffer3, sizeof(buffer3) - 1, "CLIENT_NAME=%s", data->name);
+
+      exec_with_env(config->onClientConnectFail, buffer, buffer2, buffer3, \
+          NULL);
       goto tcp_read_end;
-    if (tcp_io_read_auth_send(data))
+    }
+    if (tcp_io_read_auth_send(data)) {
+      char buffer[128], buffer2[64], buffer3[64];
+      snprintf(buffer, sizeof(buffer) - 1, "CLIENT_ADDR=%s:%hu", data->ipstr, \
+          data->port);
+      snprintf(buffer2, sizeof(buffer2) - 1, "NAME=%s", config->name);
+      snprintf(buffer3, sizeof(buffer3) - 1, "CLIENT_NAME=%s", data->name);
+
+      exec_with_env(config->onClientConnect, buffer, buffer2, buffer3, NULL);
       goto tcp_read_end;
+    }
   }
 
-  if (tcp_io_read_key_send(data))
+  if (tcp_io_read_key_send(data)) {
+    char buffer[128], buffer2[64], buffer3[64];
+    snprintf(buffer, sizeof(buffer) - 1, "CLIENT_ADDR=%s:%hu", data->ipstr, \
+        data->port);
+    snprintf(buffer2, sizeof(buffer2) - 1, "NAME=%s", config->name);
+    snprintf(buffer3, sizeof(buffer3) - 1, "CLIENT_NAME=%s", data->name);
+
+    if (!data->auth)
+      exec_with_env(config->onClientConnectFail, buffer, buffer2, buffer3, \
+        NULL);
+    else
+      exec_with_env(config->onClientConnect, buffer, buffer2, buffer3, NULL);
     goto tcp_read_end;
-  if (tcp_io_read_key_recv(data))
+  }
+  if (tcp_io_read_key_recv(data)) {
+    char buffer[128], buffer2[64], buffer3[64];
+    snprintf(buffer, sizeof(buffer) - 1, "CLIENT_ADDR=%s:%hu", data->ipstr, \
+        data->port);
+    snprintf(buffer2, sizeof(buffer2) - 1, "NAME=%s", config->name);
+    snprintf(buffer3, sizeof(buffer3) - 1, "CLIENT_NAME=%s", data->name);
+
+    if (!data->auth)
+      exec_with_env(config->onClientConnectFail, buffer, buffer2, buffer3, \
+        NULL);
+    else
+      exec_with_env(config->onClientConnect, buffer, buffer2, buffer3, NULL);
     goto tcp_read_end;
+  }
 
   tcp_new_conn(data);
+
+  if (!data->auth) {
+    char buffer[128], buffer2[64], buffer3[64];
+    snprintf(buffer, sizeof(buffer) - 1, "CLIENT_ADDR=%s:%hu", data->ipstr, \
+        data->port);
+    snprintf(buffer2, sizeof(buffer2) - 1, "NAME=%s", config->name);
+    snprintf(buffer3, sizeof(buffer3) - 1, "CLIENT_NAME=%s", data->name);
+
+    exec_with_env(config->onClientConnect, buffer, buffer2, buffer3, \
+      NULL);
+  }
 
   int try_again = 0;
   while ((!end_now) && (!data->end_now)) {
@@ -628,6 +705,14 @@ static void tcp_io_write_thread(void * data_void)
       atomic_store(&data->last_write, time(NULL));
     } while((!end_now) && (!data->end_now));
   }
+
+  char buffer[128], buffer2[64], buffer3[64];
+  snprintf(buffer, sizeof(buffer) - 1, "CLIENT_ADDR=%s:%hu", data->ipstr, \
+      data->port);
+  snprintf(buffer2, sizeof(buffer2) - 1, "NAME=%s", config->name);
+  snprintf(buffer3, sizeof(buffer3) - 1, "CLIENT_NAME=%s", data->name);
+
+  exec_with_env(config->onConnectionEnd, buffer, buffer2, buffer3, NULL);
 }
 
 void tcp_init(struct tcp_conn_info * info, tcp_conn_t conn, conn_id_t conn_id, \
