@@ -6,6 +6,7 @@
 #include <string.h>
 #include "global.h"
 #include <twofish.h>
+#include <openssl/aes.h>
 
 #define _BSD_SOURCE
 #ifndef SYS_ENDIAN
@@ -50,13 +51,55 @@ void decrypt_worker(void * void_data, size_t data_size)
 
       twofish_dec_block(&tf_key, encdata, encdata);
     }
-  } else {
+  } else if (data->net.key.type == CIPHER_TYPE_TWOFISH_CTR) {
     struct Twofish tf_key;
     twofish_init(&tf_key, 128, (unsigned char *)&key[2]);
     uint64_t tmp[2];
 
     for (uint16_t i = 0; i < length; i += 16, encdata += 16) {
       twofish_enc_block(&tf_key, (unsigned char *)key, (unsigned char *)tmp);
+
+      *(uint64_t *)encdata ^= tmp[0];
+      *(((uint64_t *)encdata) + 1) ^= tmp[1];
+
+      key[0] = be64toh(key[0]);
+      key[1] = be64toh(key[1]);
+
+      key[1]++;
+      if (!key[1])
+        key[0]++;
+
+      key[0] = htobe64(key[0]);
+      key[1] = htobe64(key[1]);
+    }
+  } else if (data->net.key.type == CIPHER_TYPE_AES_MIXED) {
+    AES_KEY aes_key;
+
+    for (uint16_t i = 0; i < length; i += 16, encdata += 16) {
+      AES_set_decrypt_key((unsigned char *)key, 128, &aes_key);
+
+      key[0] ^= *(uint64_t *)encdata;
+      key[1] ^= *(((uint64_t *)encdata) + 1);
+
+      key[0] = be64toh(key[0]);
+      key[1] = be64toh(key[1]);
+
+      key[1]++;
+      if (!key[1])
+        key[0]++;
+
+      key[0] = htobe64(key[0]);
+      key[1] = htobe64(key[1]);
+
+      AES_decrypt(encdata, encdata, &aes_key);
+    }
+  } else if (data->net.key.type == CIPHER_TYPE_AES_CTR) {
+    AES_KEY aes_key;
+    AES_set_encrypt_key((unsigned char *)&key[2], 128, &aes_key);
+    uint64_t tmp[2];
+
+    for (uint16_t i = 0; i < length; i += 16, encdata += 16) {
+      AES_encrypt((unsigned char *)key, (unsigned char *)tmp, &aes_key);
 
       *(uint64_t *)encdata ^= tmp[0];
       *(((uint64_t *)encdata) + 1) ^= tmp[1];

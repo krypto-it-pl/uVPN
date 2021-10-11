@@ -24,9 +24,15 @@ extern volatile int end_now;
 
 #define CIPHER_TYPE_TWOFISH_MIXED 0
 #define CIPHER_TYPE_TWOFISH_CTR   1
+#define CIPHER_TYPE_AES_MIXED     2
+#define CIPHER_TYPE_AES_CTR       3
+#define CIPHER_TYPE_NULL          4
 
 #define CIPHER_KEY_SIZE_TWOFISH_MIXED 2
 #define CIPHER_KEY_SIZE_TWOFISH_CTR   4
+#define CIPHER_KEY_SIZE_AES_MIXED     2
+#define CIPHER_KEY_SIZE_AES_CTR       4
+#define CIPHER_KEY_SIZE_NULL          0
 
 #ifndef MAX_CONNS
 #define MAX_CONNECTIONS 512
@@ -113,7 +119,7 @@ struct tap_conn_info
   void * io_read_thread;
 };
 
-extern uint64_t conn_mask[MAX_CONNECTIONS >> 6];
+extern uint64_t conn_mask[(MAX_CONNECTIONS + 63) >> 6];
 extern queue_t global_queue;
 extern struct RSA * thiz_rsa;
 extern sem_t config_sem;

@@ -15,6 +15,7 @@
 #include <sys/select.h>
 #include "config.h"
 #include <exec.h>
+#include <openssl/aes.h>
 
 #define _BSD_SOURCE
 #ifndef SYS_ENDIAN
@@ -433,33 +434,35 @@ static void tcp_io_read_thread(void * data_void)
     }
   }
 
-  if (tcp_io_read_key_send(data)) {
-    char buffer[128], buffer2[64], buffer3[64];
-    snprintf(buffer, sizeof(buffer) - 1, "CLIENT_ADDR=%s:%hu", data->ipstr, \
-        data->port);
-    snprintf(buffer2, sizeof(buffer2) - 1, "NAME=%s", config->name);
-    snprintf(buffer3, sizeof(buffer3) - 1, "CLIENT_NAME=%s", data->name);
+  if (data->cipher != CIPHER_TYPE_NULL) {
+    if (tcp_io_read_key_send(data)) {
+      char buffer[128], buffer2[64], buffer3[64];
+      snprintf(buffer, sizeof(buffer) - 1, "CLIENT_ADDR=%s:%hu", data->ipstr, \
+          data->port);
+      snprintf(buffer2, sizeof(buffer2) - 1, "NAME=%s", config->name);
+      snprintf(buffer3, sizeof(buffer3) - 1, "CLIENT_NAME=%s", data->name);
 
-    if (!data->auth)
-      exec_with_env(config->onClientConnectFail, buffer, buffer2, buffer3, \
-        NULL);
-    else
-      exec_with_env(config->onClientConnect, buffer, buffer2, buffer3, NULL);
-    goto tcp_read_end;
-  }
-  if (tcp_io_read_key_recv(data)) {
-    char buffer[128], buffer2[64], buffer3[64];
-    snprintf(buffer, sizeof(buffer) - 1, "CLIENT_ADDR=%s:%hu", data->ipstr, \
-        data->port);
-    snprintf(buffer2, sizeof(buffer2) - 1, "NAME=%s", config->name);
-    snprintf(buffer3, sizeof(buffer3) - 1, "CLIENT_NAME=%s", data->name);
+      if (!data->auth)
+        exec_with_env(config->onClientConnectFail, buffer, buffer2, buffer3, \
+          NULL);
+      else
+        exec_with_env(config->onClientConnect, buffer, buffer2, buffer3, NULL);
+      goto tcp_read_end;
+    }
+    if (tcp_io_read_key_recv(data)) {
+      char buffer[128], buffer2[64], buffer3[64];
+      snprintf(buffer, sizeof(buffer) - 1, "CLIENT_ADDR=%s:%hu", data->ipstr, \
+          data->port);
+      snprintf(buffer2, sizeof(buffer2) - 1, "NAME=%s", config->name);
+      snprintf(buffer3, sizeof(buffer3) - 1, "CLIENT_NAME=%s", data->name);
 
-    if (!data->auth)
-      exec_with_env(config->onClientConnectFail, buffer, buffer2, buffer3, \
-        NULL);
-    else
-      exec_with_env(config->onClientConnect, buffer, buffer2, buffer3, NULL);
-    goto tcp_read_end;
+      if (!data->auth)
+        exec_with_env(config->onClientConnectFail, buffer, buffer2, buffer3, \
+          NULL);
+      else
+        exec_with_env(config->onClientConnect, buffer, buffer2, buffer3, NULL);
+      goto tcp_read_end;
+    }
   }
 
   tcp_new_conn(data);
@@ -518,14 +521,44 @@ static void tcp_io_read_thread(void * data_void)
 
     uint8_t tmp[16];
     unsigned short size = 0;
-    struct Twofish tf_key;
     if (data->cipher == CIPHER_TYPE_TWOFISH_MIXED) {
+      struct Twofish tf_key;
+
       twofish_init(&tf_key, 128, (unsigned char *)key);
       twofish_dec_block(&tf_key, local_buffer, (unsigned char *)tmp);
-    } else {
+    } else if (data->cipher == CIPHER_TYPE_TWOFISH_CTR) {
+      struct Twofish tf_key;
+
       uint8_t tmp2[16], * lbuf = (uint8_t *)local_buffer;
       twofish_init(&tf_key, 128, (unsigned char *)&key[2]);
       twofish_enc_block(&tf_key, (unsigned char *)key, (unsigned char *)tmp2);
+      tmp[0] = tmp2[0] ^ lbuf[0];
+      tmp[1] = tmp2[1] ^ lbuf[1];
+      tmp[2] = tmp2[2] ^ lbuf[2];
+      tmp[3] = tmp2[3] ^ lbuf[3];
+      tmp[4] = tmp2[4] ^ lbuf[4];
+      tmp[5] = tmp2[5] ^ lbuf[5];
+      tmp[6] = tmp2[6] ^ lbuf[6];
+      tmp[7] = tmp2[7] ^ lbuf[7];
+      tmp[8] = tmp2[8] ^ lbuf[8];
+      tmp[9] = tmp2[9] ^ lbuf[9];
+      tmp[10] = tmp2[10] ^ lbuf[10];
+      tmp[11] = tmp2[11] ^ lbuf[11];
+      tmp[12] = tmp2[12] ^ lbuf[12];
+      tmp[13] = tmp2[13] ^ lbuf[13];
+      tmp[14] = tmp2[14] ^ lbuf[14];
+      tmp[15] = tmp2[15] ^ lbuf[15];
+    } else if (data->cipher == CIPHER_TYPE_AES_MIXED) {
+      AES_KEY aes_key;
+
+      AES_set_decrypt_key((unsigned char *)key, 128, &aes_key);
+      AES_decrypt(local_buffer, (unsigned char *)tmp, &aes_key);
+    } else if (data->cipher == CIPHER_TYPE_AES_CTR) {
+      AES_KEY aes_key;
+
+      uint8_t tmp2[16], * lbuf = (uint8_t *)local_buffer;
+      AES_set_encrypt_key((unsigned char *)&key[2], 128, &aes_key);
+      AES_encrypt((unsigned char *)key, (unsigned char *)tmp2, &aes_key);
       tmp[0] = tmp2[0] ^ lbuf[0];
       tmp[1] = tmp2[1] ^ lbuf[1];
       tmp[2] = tmp2[2] ^ lbuf[2];

@@ -62,7 +62,7 @@ static const uint8_t ipv6mcast[2] = { 0x33, 0x33 };
 static const uint8_t ipv4mcast[3] = { 0x01, 0x00, 0x5E };
 static const uint8_t ieeemcast[3] = { 0x01, 0x80, 0xC2 };
 
-uint64_t conn_mask[MAX_CONNECTIONS >> 6] = { 0 };
+uint64_t conn_mask[(MAX_CONNECTIONS + 63) >> 6] = { 0 };
 
 struct thpool_t * decrypt_thpool;
 struct thpool_t * encrypt_thpool;
@@ -119,13 +119,21 @@ int is_bcast(unsigned char * mac)
 int cipher_mode_str_to_int(const char * cipher)
 {
   if (!cipher)
-    return 0;
+    return CIPHER_TYPE_TWOFISH_MIXED;
   if (strcmp(cipher, "twofish:mixed") == 0)
-    return 0;
+    return CIPHER_TYPE_TWOFISH_MIXED;
   if (strcmp(cipher, "twofish") == 0)
-    return 0;
+    return CIPHER_TYPE_TWOFISH_MIXED;
   if (strcmp(cipher, "twofish:ctr") == 0)
-    return 1;
+    return CIPHER_TYPE_TWOFISH_CTR;
+  if (strcmp(cipher, "aes:mixed") == 0)
+    return CIPHER_TYPE_AES_MIXED;
+  if (strcmp(cipher, "aes") == 0)
+    return CIPHER_TYPE_AES_MIXED;
+  if (strcmp(cipher, "aes:ctr") == 0)
+    return CIPHER_TYPE_AES_CTR;
+  if (strcmp(cipher, "null") == 0)
+    return CIPHER_TYPE_NULL;
   return -1;
 }
 
