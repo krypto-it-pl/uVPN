@@ -47,12 +47,23 @@ void l2_sw_done(void)
   avl_dispose(g_mac_table);
 }
 
+void l2_sw_clear_arp(void)
+{
+  avl_dispose(g_mac_table);
+  g_mac_table = avl_create(sizeof(mac_table_t), MAC_TABLE_SIZE, comparator);
+}
+
 void l2_sw_worker(void * void_data, size_t data_size)
 {
   struct packet_record * data = (struct packet_record *)void_data;
 
   if (data->msg_type == MSG_TYPE_CLOSE_CONN) {
     avl_delete_if(g_mac_table, del_comparator, &data->source);
+    return;
+  }
+
+  if (data->msg_type == MSG_TYPE_CLEAR_ARP) {
+    l2_sw_clear_arp();
     return;
   }
 

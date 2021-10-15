@@ -177,6 +177,18 @@ static void on_signal_logs_reload(int signum)
   logger_reopen();
 }
 
+static void on_signal_clear_arp(int signum)
+{
+  struct packet_record record;
+  memset(&record, 0, sizeof(record));
+
+  record.msg_type = MSG_TYPE_CLEAR_ARP;
+
+  size_t data_size = ((char *)&record.conn - (char *)&record);
+
+  queue_enqueue(global_queue, &record, data_size, 0);
+}
+
 static void decrypt_init(void)
 {
   for (size_t i = 0; i < sizeof(decrypt_data) / sizeof(decrypt_data[0]); i++) {
@@ -523,6 +535,7 @@ int main(int argc, char * argv[])
   signal(SIGTERM, &on_signal_term);
   signal(SIGINT, &on_signal_term);
   signal(SIGUSR1, &on_signal_config_reload);
+  signal(SIGUSR2, &on_signal_clear_arp);
   signal(SIGHUP, &on_signal_logs_reload);
   conn_mask[0] = 1;
 

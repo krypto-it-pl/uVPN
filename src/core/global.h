@@ -53,6 +53,7 @@ extern volatile int end_now;
 #define MSG_TYPE_NEW_CONN    4
 #define MSG_TYPE_CLOSE_CONN  5
 #define MSG_TYPE_FREEZE_CONN 6
+#define MSG_TYPE_CLEAR_ARP   7
 
 #define MAX_MTU 1540
 
