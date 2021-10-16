@@ -100,7 +100,7 @@ void tcp_ping(struct tcp_conn_info * data, int flag)
       ((((char *)&record.net.flags - (char *)&record.net.pkt_idx) + 15) & \
       ~0x0F);
 
-  logger_printf(LOGGER_ERROR, "Data transfer with %s timeouted. Pinging it.", \
+  logger_printf(LOGGER_INFO, "Data transfer with %s timeouted. Pinging it.", \
       data->name);
 
   queue_enqueue(global_queue, &record, data_size, MAX_CONNECTIONS);
@@ -508,8 +508,11 @@ static void tcp_io_read_thread(void * data_void)
     } else
       try_again = 0;
   
-    if (local_buffer_fill < 16)
+    if (time(NULL) > atomic_load(&data->last_write) + data->timeout[0])
+      tcp_ping(data, 1);
+    if (local_buffer_fill < 16) {
       continue;
+    }
 
     uint64_t key[4] = {be64toh(data->dec_key[0]), be64toh(data->dec_key[1]), \
         data->dec_key[2], data->dec_key[3]};
@@ -575,6 +578,8 @@ static void tcp_io_read_thread(void * data_void)
       tmp[13] = tmp2[13] ^ lbuf[13];
       tmp[14] = tmp2[14] ^ lbuf[14];
       tmp[15] = tmp2[15] ^ lbuf[15];
+    } else if (data->cipher == CIPHER_TYPE_NULL) {
+      memcpy(tmp, local_buffer, 16);
     }
     size = (tmp[8] << 8) | tmp[9];
 
@@ -612,9 +617,6 @@ static void tcp_io_read_thread(void * data_void)
           }
         }
       }
-    } else {
-      if (time(NULL) > atomic_load(&data->last_write) + data->timeout[0])
-        tcp_ping(data, 1);
     }
 
     atomic_store(&data->last_read, time(NULL));

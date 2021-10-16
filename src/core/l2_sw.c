@@ -95,7 +95,7 @@ void l2_sw_worker(void * void_data, size_t data_size)
         ((mac_entry.pkt_idx & 0xFFF00000) > 0))) {
       data->msg_type = MSG_TYPE_DROP;
 
-      logger_printf(LOGGER_INFO, "Drop duplicated packet from " \
+      logger_printf(LOGGER_DEBUG, "Drop duplicated packet from " \
           " %02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx", \
           data->net.src_mac[0], data->net.src_mac[1], data->net.src_mac[2],
           data->net.src_mac[3], data->net.src_mac[4], data->net.src_mac[5]);

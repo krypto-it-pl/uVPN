@@ -461,10 +461,10 @@ static void reconnect_servers(void)
       logger_printf(LOGGER_DEBUG, "Try to connect to %s", \
           config->static_servers[i].name);
  
-      if (dns_iterate_by_hostname(config->static_servers[i].connect_addr, \
+      dns_iterate_by_hostname(config->static_servers[i].connect_addr, \
           config->static_servers[i].connect_port, iterate_over_dns, \
-          &config->static_servers[i]) > 0)
-        config->static_servers[i].last_reconnect_try = now;
+          &config->static_servers[i]);
+      config->static_servers[i].last_reconnect_try = now;
     }
   }
 }
